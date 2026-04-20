@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>株式スコア比較ツール</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f0f2f5;
+    --card: #ffffff;
+    --border: #d9dee6;
+    --primary: #3b6bdc;
+    --primary-hover: #2f58c0;
+    --danger: #e54444;
+    --success: #27ae60;
+    --text: #1a1e2b;
+    --muted: #6b7280;
+    --score-pos: #1a7a45;
+    --score-neg: #c0392b;
+    --th-bg: #f7f9fc;
+    --row-hover: #f0f5ff;
+    --sort-active: #3b6bdc;
+    --radius: 8px;
+  }
+
+  body {
+    font-family: -apple-system, "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── ヘッダー ── */
+  .app-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .app-header h1 { font-size: 16px; font-weight: 700; letter-spacing: .02em; flex: 1; }
+
+  /* ── ファイル選択 ── */
+  .file-zone {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .file-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(255,255,255,.2);
+    border: 1.5px solid rgba(255,255,255,.5);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    transition: background .15s;
+    white-space: nowrap;
+  }
+  .file-label:hover { background: rgba(255,255,255,.32); }
+  #fileInput { display: none; }
+  #fileNameDisplay {
+    font-size: 11px;
+    color: rgba(255,255,255,.8);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* URL読み込み */
+  .url-zone {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .url-input {
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(255,255,255,.5);
+    background: rgba(255,255,255,.15);
+    color: #fff;
+    font-size: 11px;
+    width: 260px;
+    outline: none;
+  }
+  .url-input::placeholder { color: rgba(255,255,255,.55); }
+  .url-input:focus { background: rgba(255,255,255,.25); border-color: #fff; }
+  .url-btn {
+    padding: 5px 12px;
+    background: rgba(255,255,255,.25);
+    border: 1.5px solid rgba(255,255,255,.6);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .12s;
+  }
+  .url-btn:hover { background: rgba(255,255,255,.38); }
+  .url-sep {
+    color: rgba(255,255,255,.5);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  /* ── メインコンテンツ ── */
+  .main { padding: 16px 20px; max-width: 100%; }
+
+  /* ── フィルターカード ── */
+  .filter-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .filter-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .filter-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+
+  /* チェックボックスグループ（市場） */
+  .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip-check { display: none; }
+  .chip-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all .12s;
+    user-select: none;
+  }
+  .chip-check:checked + .chip-label {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+  }
+
+  /* 業種マルチセレクト */
+  .sector-select-wrap { position: relative; }
+  .sector-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 160px;
+    justify-content: space-between;
+    white-space: nowrap;
+    transition: border-color .12s;
+  }
+  .sector-btn:hover { border-color: var(--primary); }
+  .sector-btn.open { border-color: var(--primary); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .sector-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 50;
+    background: #fff;
+    border: 1.5px solid var(--primary);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    min-width: 200px;
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  }
+  .sector-dropdown.open { display: block; }
+  .sector-actions {
+    display: flex;
+    padding: 6px 8px;
+    gap: 6px;
+    border-bottom: 1px solid var(--border);
+    background: #f7f9fc;
+  }
+  .sector-action-btn {
+    font-size: 10px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    background: #fff;
+    font-weight: 600;
+    color: var(--muted);
+    transition: all .12s;
+  }
+  .sector-action-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .sector-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background .1s;
+  }
+  .sector-item:hover { background: var(--row-hover); }
+  .sector-item input { cursor: pointer; accent-color: var(--primary); }
+
+  /* 配当利回り範囲 */
+  .range-group { display: flex; align-items: center; gap: 6px; }
+  .range-input {
+    width: 70px;
+    padding: 6px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+    outline: none;
+    transition: border-color .12s;
+  }
+  .range-input:focus { border-color: var(--primary); }
+  .range-sep { color: var(--muted); font-size: 12px; }
+
+  /* 証券コード入力 */
+  .code-input-wrap { position: relative; display: flex; flex-direction: column; gap: 4px; }
+  .code-input {
+    width: 120px;
+    padding: 6px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: monospace;
+    outline: none;
+    transition: border-color .12s;
+    letter-spacing: .05em;
+  }
+  .code-input:focus { border-color: var(--primary); }
+  .code-input.invalid { border-color: var(--danger); background: #fff5f5; }
+  .code-error {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--danger);
+    display: none;
+    white-space: nowrap;
+  }
+
+  /* デュアルスライダー */
+  .dual-slider-wrap {
+    width: 210px;
+    padding: 4px 0 2px;
+  }
+  .dual-track-bg {
+    position: relative;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 8px;
+  }
+  .dual-track-fill {
+    position: absolute;
+    height: 100%;
+    background: var(--primary);
+    border-radius: 2px;
+  }
+  .dual-thumbs {
+    position: relative;
+    height: 18px;
+    margin-top: -11px;
+  }
+  .dual-thumbs input[type=range] {
+    position: absolute;
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    pointer-events: none;
+    height: 18px;
+    margin: 0;
+    padding: 0;
+    outline: none;
+  }
+  .dual-thumbs input[type=range]::-webkit-slider-runnable-track { background: transparent; }
+  .dual-thumbs input[type=range]::-moz-range-track { background: transparent; }
+  .dual-thumbs input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    pointer-events: all;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2.5px solid #fff;
+    box-shadow: 0 1px 5px rgba(0,0,0,.25);
+    cursor: pointer;
+    transition: box-shadow .12s;
+  }
+  .dual-thumbs input[type=range]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 6px rgba(59,107,220,.18);
+  }
+  .dual-thumbs input[type=range]::-moz-range-thumb {
+    pointer-events: all;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2.5px solid #fff;
+    box-shadow: 0 1px 5px rgba(0,0,0,.25);
+    cursor: pointer;
+  }
+
+  /* ボタン */
+  .btn-row { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition: all .12s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-primary:disabled { background: #a0b4dc; cursor: not-allowed; }
+  .btn-outline {
+    background: #fff;
+    color: var(--muted);
+    border: 1.5px solid var(--border);
+  }
+  .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-success:hover { background: #219150; }
+  .btn-success:disabled { background: #8ec9a7; cursor: not-allowed; }
+
+  /* ── ステータスバー ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 0 2px;
+  }
+  .status-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .status-count span { color: var(--primary); font-size: 14px; }
+  .page-controls { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .page-select {
+    padding: 4px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
+    font-size: 11px;
+    background: #fff;
+    cursor: pointer;
+    outline: none;
+  }
+  .page-btn {
+    padding: 4px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    transition: all .12s;
+  }
+  .page-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  .page-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .page-info { color: var(--muted); }
+
+  /* ── テーブル ── */
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: auto;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    max-height: calc(100vh - 280px);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  thead { position: sticky; top: 0; z-index: 10; }
+  th {
+    background: var(--th-bg);
+    border-bottom: 2px solid var(--border);
+    padding: 9px 10px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 11px;
+    white-space: nowrap;
+    user-select: none;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  th.sortable { cursor: pointer; }
+  th.sortable:hover { color: var(--primary); background: #edf2ff; }
+  th.sorted-asc, th.sorted-desc { color: var(--sort-active); background: #edf2ff; }
+  .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; opacity: .5; }
+  th.sorted-asc .sort-icon, th.sorted-desc .sort-icon { opacity: 1; }
+
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f0f2f5;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  tr:hover td { background: var(--row-hover); }
+  tr:last-child td { border-bottom: none; }
+
+  /* 列幅 */
+  .col-market { width: 70px; }
+  .col-code { width: 60px; font-weight: 700; font-family: monospace; }
+  .col-name { min-width: 140px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+  .col-sector { min-width: 100px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  .col-price { width: 70px; text-align: right; }
+  .col-yield { width: 70px; text-align: right; font-weight: 700; color: var(--success); }
+  .col-score { width: 60px; text-align: right; }
+  .col-total { width: 72px; text-align: right; }
+
+  /* スコア色分け */
+  .score-pos { color: var(--score-pos); font-weight: 700; }
+  .score-neg { color: var(--score-neg); font-weight: 700; }
+  .score-zero { color: var(--muted); }
+  .total-high { background: #e6f4ea; color: #1a7a45; font-weight: 800; border-radius: 4px; padding: 2px 6px; }
+  .total-mid { background: #fef9e7; color: #7d6608; font-weight: 700; border-radius: 4px; padding: 2px 6px; }
+  .total-low { background: #fdecea; color: #c0392b; font-weight: 700; border-radius: 4px; padding: 2px 6px; }
+
+  /* 市場バッジ */
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .badge-PRM { background: #dbeafe; color: #1d4ed8; }
+  .badge-STD { background: #dcfce7; color: #166534; }
+  .badge-GRO { background: #fef3c7; color: #92400e; }
+  .badge-other { background: #f3f4f6; color: #374151; }
+
+  /* ロード画面 */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 13px; font-weight: 600; }
+  .empty-state small { font-size: 11px; }
+
+  /* スクロールバー */
+  .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+  .table-wrap::-webkit-scrollbar-track { background: #f0f2f5; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #c0c8d8; border-radius: 3px; }
+  .table-wrap::-webkit-scrollbar-thumb:hover { background: #a0aabf; }
+
+  /* ドロップオーバーレイ */
+  body.drag-over::after {
+    content: 'CSVファイルをドロップ';
+    position: fixed; inset: 0;
+    background: rgba(59,107,220,.15);
+    border: 3px dashed var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700; color: var(--primary);
+    z-index: 999;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="app-header">
+  <h1>📊 株式スコア比較ツール</h1>
+  <div class="file-zone">
+    <!-- ローカルファイル読み込み -->
+    <label class="file-label" for="fileInput">
+      <span>📂</span> ローカルCSV
+    </label>
+    <input type="file" id="fileInput" accept=".csv">
+    <span id="fileNameDisplay">未選択</span>
+
+    <span class="url-sep">｜</span>
+
+    <!-- URL読み込み（GitHub Pages / raw.githubusercontent.com） -->
+    <div class="url-zone">
+      <input type="text" id="urlInput" class="url-input"
+        placeholder="GitHub raw URL を貼り付け（外出先用）">
+      <button class="url-btn" id="urlLoadBtn">読み込む</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- フィルターカード -->
+  <div class="filter-card">
+    <div class="filter-title">🔍 絞り込み &amp; ソート</div>
+    <div class="filter-grid">
+
+      <!-- 市場 -->
+      <div class="filter-group">
+        <label>市場</label>
+        <div class="checkbox-group" id="marketCheckboxes">
+          <span style="color:var(--muted);font-size:11px;">CSV読み込み後に表示</span>
+        </div>
+      </div>
+
+      <!-- 業種 -->
+      <div class="filter-group">
+        <label>業種</label>
+        <div class="sector-select-wrap">
+          <button class="sector-btn" id="sectorBtn" disabled>
+            <span id="sectorBtnLabel">すべて</span>
+            <span>▾</span>
+          </button>
+          <div class="sector-dropdown" id="sectorDropdown">
+            <div class="sector-actions">
+              <button class="sector-action-btn" id="sectorAllBtn">全選択</button>
+              <button class="sector-action-btn" id="sectorNoneBtn">全解除</button>
+            </div>
+            <div id="sectorList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 配当利回り範囲 -->
+      <div class="filter-group">
+        <label>配当利回り (%)</label>
+        <div class="dual-slider-wrap">
+          <div class="dual-track-bg">
+            <div class="dual-track-fill" id="yieldFill"></div>
+          </div>
+          <div class="dual-thumbs">
+            <input type="range" id="yieldSliderMin" step="0.1">
+            <input type="range" id="yieldSliderMax" step="0.1">
+          </div>
+        </div>
+        <div class="range-group">
+          <input type="number" class="range-input" id="yieldMin" placeholder="最小" step="0.1" min="0">
+          <span class="range-sep">〜</span>
+          <input type="number" class="range-input" id="yieldMax" placeholder="最大" step="0.1" min="0">
+          <span style="font-size:11px;color:var(--muted)">%</span>
+        </div>
+      </div>
+
+      <!-- 証券コード -->
+      <div class="filter-group">
+        <label>証券コード</label>
+        <div class="code-input-wrap">
+          <input type="text" id="codeFilter" class="code-input"
+                 placeholder="例: 7203" maxlength="10" autocomplete="off" spellcheck="false">
+          <span class="code-error" id="codeError">⚠ 該当する銘柄がありません</span>
+        </div>
+      </div>
+
+      <!-- ボタン -->
+      <div class="btn-row">
+        <button class="btn btn-outline" id="resetBtn">↺ リセット</button>
+        <button class="btn btn-success" id="exportBtn" disabled>⬇ CSV保存</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ステータスバー -->
+  <div class="status-bar">
+    <div class="status-count" id="statusCount">—</div>
+    <div class="page-controls">
+      <label style="color:var(--muted)">表示件数:</label>
+      <select class="page-select" id="pageSizeSelect">
+        <option value="50">50件</option>
+        <option value="100">100件</option>
+        <option value="200">200件</option>
+        <option value="999999">全件</option>
+      </select>
+      <button class="page-btn" id="prevBtn" disabled>◀</button>
+      <span class="page-info" id="pageInfo">—</span>
+      <button class="page-btn" id="nextBtn" disabled>▶</button>
+    </div>
+  </div>
+
+  <!-- テーブル -->
+  <div class="table-wrap" id="tableWrap">
+    <div class="empty-state">
+      <div class="icon">📂</div>
+      <p>CSVファイルを読み込んでください</p>
+      <small>上部の「CSVを読み込む」ボタン、またはファイルをドラッグ＆ドロップ</small>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =============================================
+// アプリ状態
+// =============================================
+let allRows = [];       // 全データ
+let headers = [];      // CSVヘッダー
+let filteredRows = []; // フィルタ後データ
+let sortCol = '総合スコア';
+let sortDir = -1;      // -1: desc, 1: asc
+let currentPage = 1;
+let pageSize = 50;
+
+// =============================================
+// CSV パーサー
+// =============================================
+function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // BOM除去
+  const lines = splitCSVLines(text);
+  if (lines.length < 2) return null;
+  const hdrs = parseCSVLine(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = parseCSVLine(lines[i]);
+    const row = {};
+    hdrs.forEach((h, idx) => { row[h] = vals[idx] !== undefined ? vals[idx].trim() : ''; });
+    rows.push(row);
+  }
+  return { headers: hdrs, rows };
+}
+
+function splitCSVLines(text) {
+  const lines = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') inQ = !inQ;
+    else if ((c === '\n' || c === '\r') && !inQ) {
+      if (c === '\r' && text[i+1] === '\n') i++;
+      lines.push(cur); cur = ''; continue;
+    }
+    cur += c;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+function parseCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+// =============================================
+// CSV 読み込み（共通処理）
+// =============================================
+function processCSVText(text, sourceName) {
+  const result = parseCSV(text);
+  if (!result || result.rows.length === 0) {
+    alert('CSVの読み込みに失敗しました。');
+    return;
+  }
+  headers = result.headers;
+  allRows = result.rows.map(r => {
+    const n = {};
+    headers.forEach(h => {
+      const v = r[h];
+      const num = parseFloat(v);
+      n[h] = (v !== '' && !isNaN(num)) ? num : v;
+    });
+    return n;
+  });
+  document.getElementById('fileNameDisplay').textContent = sourceName;
+  initFilters();
+  applyFilters();
+  document.getElementById('exportBtn').disabled = false;
+}
+
+function loadCSV(file) {
+  const reader = new FileReader();
+  reader.onload = e => processCSVText(e.target.result, file.name);
+  reader.readAsText(file, 'UTF-8');
+}
+
+// URL からCSVを取得（GitHub raw URL 対応）
+async function loadCSVFromURL(url) {
+  if (!url) return;
+  document.getElementById('fileNameDisplay').textContent = '読み込み中...';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const shortName = url.split('/').pop() || 'url-loaded.csv';
+    processCSVText(text, shortName);
+  } catch(e) {
+    alert(`URLからの読み込みに失敗しました。\n${e.message}\n\nCORSエラーの場合: raw.githubusercontent.com のURLを使用してください。`);
+    document.getElementById('fileNameDisplay').textContent = '読み込み失敗';
+  }
+}
+
+// =============================================
+// フィルター初期化
+// =============================================
+function initFilters() {
+  // 市場
+  const markets = [...new Set(allRows.map(r => r['市場'] || '').filter(Boolean))].sort();
+  const hasUnsetMarket = allRows.some(r => !r['市場']);
+  const mcWrap = document.getElementById('marketCheckboxes');
+  mcWrap.innerHTML = '';
+  // 全選択チップ
+  addChip(mcWrap, 'market', '__all__', 'すべて', true);
+  markets.forEach(m => addChip(mcWrap, 'market', m, m, true));
+  if (hasUnsetMarket) addChip(mcWrap, 'market', '__unset__', '未設定', true);
+  mcWrap.querySelectorAll('.chip-check').forEach(cb => cb.addEventListener('change', onMarketChange));
+
+  // 業種
+  const sectors = [...new Set(allRows.map(r => r['業種'] || '').filter(Boolean))].sort();
+  const hasUnsetSector = allRows.some(r => !r['業種']);
+  const slist = document.getElementById('sectorList');
+  slist.innerHTML = '';
+  sectors.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'sector-item';
+    div.innerHTML = `<input type="checkbox" class="sector-check" value="${esc(s)}" checked> <span>${esc(s)}</span>`;
+    div.querySelector('input').addEventListener('change', onSectorChange);
+    div.addEventListener('click', e => { if (e.target.tagName !== 'INPUT') div.querySelector('input').click(); });
+    slist.appendChild(div);
+  });
+  if (hasUnsetSector) {
+    const div = document.createElement('div');
+    div.className = 'sector-item';
+    div.innerHTML = `<input type="checkbox" class="sector-check" value="__unset__" checked> <span style="color:var(--muted);font-style:italic">未設定</span>`;
+    div.querySelector('input').addEventListener('change', onSectorChange);
+    div.addEventListener('click', e => { if (e.target.tagName !== 'INPUT') div.querySelector('input').click(); });
+    slist.appendChild(div);
+  }
+  document.getElementById('sectorBtn').disabled = false;
+  updateSectorBtnLabel();
+
+  // 配当利回り範囲の初期値
+  const yields = allRows.map(r => parseFloat(r['配当利回り(%)'])).filter(n => !isNaN(n));
+  const yAbsMin = Math.floor(Math.min(...yields) * 10) / 10;
+  const yAbsMax = Math.ceil(Math.max(...yields) * 10) / 10;
+  initYieldSliders(yAbsMin, yAbsMax);
+}
+
+// =============================================
+// 配当利回りスライダー
+// =============================================
+function initYieldSliders(minV, maxV) {
+  const sMin = document.getElementById('yieldSliderMin');
+  const sMax = document.getElementById('yieldSliderMax');
+  [sMin, sMax].forEach(s => { s.min = minV; s.max = maxV; s.step = 0.1; });
+  sMin.value = minV;
+  sMax.value = maxV;
+  document.getElementById('yieldMin').value = '';
+  document.getElementById('yieldMax').value = '';
+  document.getElementById('yieldMin').placeholder = minV.toFixed(1);
+  document.getElementById('yieldMax').placeholder = maxV.toFixed(1);
+  updateYieldFill();
+}
+
+function updateYieldFill() {
+  const sMin = document.getElementById('yieldSliderMin');
+  const sMax = document.getElementById('yieldSliderMax');
+  const fill = document.getElementById('yieldFill');
+  const lo = parseFloat(sMin.value), hi = parseFloat(sMax.value);
+  const min = parseFloat(sMin.min), max = parseFloat(sMin.max);
+  const span = max - min || 1;
+  fill.style.left  = ((lo - min) / span * 100) + '%';
+  fill.style.width = ((hi - lo)  / span * 100) + '%';
+}
+
+// スライダー → 数値入力
+document.getElementById('yieldSliderMin').addEventListener('input', function() {
+  const sMax = document.getElementById('yieldSliderMax');
+  if (+this.value > +sMax.value) this.value = sMax.value;
+  document.getElementById('yieldMin').value = (+this.value).toFixed(1);
+  updateYieldFill(); applyFilters();
+});
+document.getElementById('yieldSliderMax').addEventListener('input', function() {
+  const sMin = document.getElementById('yieldSliderMin');
+  if (+this.value < +sMin.value) this.value = sMin.value;
+  document.getElementById('yieldMax').value = (+this.value).toFixed(1);
+  updateYieldFill(); applyFilters();
+});
+
+// 数値入力 → スライダー
+document.getElementById('yieldMin').addEventListener('input', function() {
+  const sMin = document.getElementById('yieldSliderMin');
+  const sMax = document.getElementById('yieldSliderMax');
+  let v = parseFloat(this.value);
+  if (!isNaN(v)) {
+    v = Math.max(+sMin.min, Math.min(v, +sMax.value));
+    sMin.value = v; updateYieldFill();
+  }
+  applyFilters();
+});
+document.getElementById('yieldMax').addEventListener('input', function() {
+  const sMin = document.getElementById('yieldSliderMin');
+  const sMax = document.getElementById('yieldSliderMax');
+  let v = parseFloat(this.value);
+  if (!isNaN(v)) {
+    v = Math.min(+sMax.max, Math.max(v, +sMin.value));
+    sMax.value = v; updateYieldFill();
+  }
+  applyFilters();
+});
+
+let _chipSeq = 0;
+function addChip(wrap, name, value, label, checked) {
+  const id = 'chip_' + (++_chipSeq);
+  wrap.insertAdjacentHTML('beforeend',
+    `<input type="checkbox" class="chip-check" id="${id}" name="${name}" value="${value}" ${checked?'checked':''}>`+
+    `<label class="chip-label" for="${id}">${label}</label>`
+  );
+}
+
+function onMarketChange(e) {
+  const allChk = document.querySelector('.chip-check[value="__all__"]');
+  const others = document.querySelectorAll('.chip-check[name="market"]:not([value="__all__"])');
+  if (e.target.value === '__all__') {
+    others.forEach(c => c.checked = e.target.checked);
+  } else {
+    allChk.checked = [...others].every(c => c.checked);
+  }
+  applyFilters();
+}
+function onSectorChange() { updateSectorBtnLabel(); applyFilters(); }
+
+function updateSectorBtnLabel() {
+  const checks = document.querySelectorAll('.sector-check');
+  const checked = [...checks].filter(c => c.checked).length;
+  const lbl = document.getElementById('sectorBtnLabel');
+  if (checked === checks.length) lbl.textContent = 'すべて';
+  else if (checked === 0) lbl.textContent = '(未選択)';
+  else lbl.textContent = `${checked}件選択中`;
+}
+
+// =============================================
+// 業種ドロップダウン制御
+// =============================================
+document.getElementById('sectorBtn').addEventListener('click', e => {
+  const btn = document.getElementById('sectorBtn');
+  const dd = document.getElementById('sectorDropdown');
+  btn.classList.toggle('open');
+  dd.classList.toggle('open');
+  e.stopPropagation();
+});
+document.addEventListener('click', () => {
+  document.getElementById('sectorBtn').classList.remove('open');
+  document.getElementById('sectorDropdown').classList.remove('open');
+});
+document.getElementById('sectorDropdown').addEventListener('click', e => e.stopPropagation());
+
+document.getElementById('sectorAllBtn').addEventListener('click', () => {
+  document.querySelectorAll('.sector-check').forEach(c => { c.checked = true; });
+  updateSectorBtnLabel(); applyFilters();
+});
+document.getElementById('sectorNoneBtn').addEventListener('click', () => {
+  document.querySelectorAll('.sector-check').forEach(c => { c.checked = false; });
+  updateSectorBtnLabel(); applyFilters();
+});
+
+// =============================================
+// フィルター適用
+// =============================================
+function applyFilters() {
+  // 市場フィルター
+  const selectedMarkets = new Set(
+    [...document.querySelectorAll('.chip-check[name="market"]:not([value="__all__"]):checked')]
+      .map(c => c.value)
+  );
+  // 業種フィルター
+  const selectedSectors = new Set(
+    [...document.querySelectorAll('.sector-check:checked')].map(c => c.value)
+  );
+  // 利回り範囲
+  const yMin = parseFloat(document.getElementById('yieldMin').value);
+  const yMax = parseFloat(document.getElementById('yieldMax').value);
+  // 証券コード
+  const codeRaw = document.getElementById('codeFilter').value.trim();
+  const codeQuery = codeRaw.toUpperCase();
+
+  filteredRows = allRows.filter(r => {
+    if (selectedMarkets.size > 0 && !selectedMarkets.has(r['市場'] || '__unset__')) return false;
+    if (selectedSectors.size > 0 && !selectedSectors.has(r['業種'] || '__unset__')) return false;
+    const y = parseFloat(r['配当利回り(%)']);
+    if (!isNaN(yMin) && y < yMin) return false;
+    if (!isNaN(yMax) && y > yMax) return false;
+    if (codeQuery) {
+      const code = String(r['証券コード']).toUpperCase();
+      if (!code.includes(codeQuery)) return false;
+    }
+    return true;
+  });
+
+  // 証券コード入力の状態表示
+  const codeInput = document.getElementById('codeFilter');
+  const codeError = document.getElementById('codeError');
+  if (codeQuery && filteredRows.length === 0) {
+    codeInput.classList.add('invalid');
+    codeError.style.display = 'block';
+  } else {
+    codeInput.classList.remove('invalid');
+    codeError.style.display = 'none';
+  }
+
+  // ソート
+  filteredRows.sort((a, b) => {
+    const av = a[sortCol], bv = b[sortCol];
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
+    return String(av).localeCompare(String(bv), 'ja') * sortDir;
+  });
+
+  currentPage = 1;
+  renderTable();
+}
+
+// =============================================
+// テーブルレンダリング
+// =============================================
+const SCORE_COLS = ['売上高スコア','営業利益率スコア','EPSスコア','営業CFスコア',
+                    '一株配当スコア','配当性向スコア','自己資本比率スコア','現金等スコア'];
+const COL_LABELS = {
+  '市場':'市場','証券コード':'コード','銘柄名':'銘柄名','業種':'業種',
+  '株価':'株価','配当利回り(%)':'利回り%','_rank':'順位',
+  '総合スコア':'総合',
+  '売上高スコア':'売上高','営業利益率スコア':'営業益率',
+  'EPSスコア':'EPS','営業CFスコア':'営CF',
+  '一株配当スコア':'1株配当','配当性向スコア':'配当性向',
+  '自己資本比率スコア':'自己資本','現金等スコア':'現金等'
+};
+const DISPLAY_COLS = Object.keys(COL_LABELS);
+const NUMERIC_COLS = ['株価','配当利回り(%)',...SCORE_COLS,'総合スコア'];
+const SORTABLE_COLS = NUMERIC_COLS;
+
+function renderTable() {
+  if (allRows.length === 0) return;
+
+  const total = filteredRows.length;
+  pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * pageSize;
+  const end = Math.min(start + pageSize, total);
+  const pageRows = filteredRows.slice(start, end);
+
+  // ステータス
+  document.getElementById('statusCount').innerHTML =
+    `絞込み結果: <span>${total.toLocaleString()}</span> / ${allRows.length.toLocaleString()} 銘柄`;
+  document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+  document.getElementById('prevBtn').disabled = currentPage <= 1;
+  document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+
+  // ヘッダー構築
+  const thHTML = DISPLAY_COLS.map(col => {
+    const sortable = SORTABLE_COLS.includes(col) || col === '総合スコア';
+    const isSorted = col === sortCol;
+    const icon = isSorted ? (sortDir === -1 ? '▼' : '▲') : '↕';
+    const cls = [
+      sortable ? 'sortable' : '',
+      isSorted ? (sortDir === -1 ? 'sorted-desc' : 'sorted-asc') : ''
+    ].join(' ');
+    return `<th class="${cls}" data-col="${col}">${COL_LABELS[col] || col}${sortable ? `<span class="sort-icon">${icon}</span>` : ''}</th>`;
+  }).join('');
+
+  // 絞り込み後の全順位マップを事前計算（総合スコア降順での順位）
+  const rankMap = new Map();
+  filteredRows.forEach((r, i) => rankMap.set(r, i + 1));
+
+  // 行構築
+  const bodyHTML = pageRows.map(r => {
+    const cells = DISPLAY_COLS.map(col => {
+      const v = r[col];
+      if (col === '市場') return `<td class="col-market">${marketBadge(v)}</td>`;
+      if (col === '証券コード') return `<td class="col-code">${esc(v)}</td>`;
+      if (col === '銘柄名') return `<td class="col-name" title="${esc(v)}">${esc(v)}</td>`;
+      if (col === '業種') return `<td class="col-sector" title="${esc(v)}">${esc(v)}</td>`;
+      if (col === '株価') return `<td class="col-price">${typeof v==='number' ? v.toLocaleString() : v}</td>`;
+      if (col === '配当利回り(%)') return `<td class="col-yield">${typeof v==='number' ? v.toFixed(2) : v}</td>`;
+      if (col === '_rank') {
+        const rank = rankMap.get(r);
+        const total = filteredRows.length;
+        return `<td class="col-score" style="color:var(--muted);font-weight:700">${rank}<span style="font-size:10px;font-weight:400"> /${total}</span></td>`;
+      }
+      if (col === '総合スコア') return `<td class="col-total">${totalBadge(v)}</td>`;
+      if (SCORE_COLS.includes(col)) return `<td class="col-score">${scoreFmt(v)}</td>`;
+      return `<td>${esc(v)}</td>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+
+  document.getElementById('tableWrap').innerHTML =
+    `<table><thead><tr>${thHTML}</tr></thead><tbody>${bodyHTML || '<tr><td colspan="${DISPLAY_COLS.length}" style="text-align:center;padding:40px;color:var(--muted)">表示データなし</td></tr>'}</tbody></table>`;
+
+  // ソートイベント
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = -1; }
+      applyFilters();
+    });
+  });
+}
+
+function marketBadge(v) {
+  if (!v) return '';
+  let cls = 'badge-other';
+  if (v.includes('PRM')) cls = 'badge-PRM';
+  else if (v.includes('STD')) cls = 'badge-STD';
+  else if (v.includes('GRO')) cls = 'badge-GRO';
+  return `<span class="badge ${cls}">${esc(v)}</span>`;
+}
+
+function totalBadge(v) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return esc(v);
+  let cls = n >= 100 ? 'total-high' : n >= 30 ? 'total-mid' : 'total-low';
+  return `<span class="${cls}">${n}</span>`;
+}
+
+function scoreFmt(v) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return `<span class="score-zero">—</span>`;
+  if (n > 0) return `<span class="score-pos">+${n}</span>`;
+  if (n < 0) return `<span class="score-neg">${n}</span>`;
+  return `<span class="score-zero">0</span>`;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// =============================================
+// ページング
+// =============================================
+document.getElementById('prevBtn').addEventListener('click', () => { currentPage--; renderTable(); });
+document.getElementById('nextBtn').addEventListener('click', () => { currentPage++; renderTable(); });
+document.getElementById('pageSizeSelect').addEventListener('change', () => { currentPage = 1; renderTable(); });
+
+// =============================================
+// リセット
+// =============================================
+document.getElementById('resetBtn').addEventListener('click', () => {
+  document.querySelectorAll('.chip-check').forEach(c => c.checked = true);
+  document.querySelectorAll('.sector-check').forEach(c => c.checked = true);
+  const sMin = document.getElementById('yieldSliderMin');
+  const sMax = document.getElementById('yieldSliderMax');
+  sMin.value = sMin.min; sMax.value = sMax.max;
+  document.getElementById('yieldMin').value = '';
+  document.getElementById('yieldMax').value = '';
+  updateYieldFill();
+  const cf = document.getElementById('codeFilter');
+  cf.value = '';
+  cf.classList.remove('invalid');
+  document.getElementById('codeError').style.display = 'none';
+  sortCol = '総合スコア'; sortDir = -1;
+  updateSectorBtnLabel();
+  applyFilters();
+});
+
+// =============================================
+// CSV エクスポート
+// =============================================
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (filteredRows.length === 0) { alert('エクスポートするデータがありません。'); return; }
+  const lines = [headers.join(',')];
+  filteredRows.forEach(r => {
+    lines.push(headers.map(h => {
+      const v = String(r[h] ?? '');
+      return (v.includes(',') || v.includes('"') || v.includes('\n'))
+        ? '"' + v.replace(/"/g,'""') + '"' : v;
+    }).join(','));
+  });
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  const ts = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+  a.href = url; a.download = `stock_scores_filtered_${ts}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+});
+
+// =============================================
+// ファイル入力 / URL入力
+// =============================================
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) loadCSV(e.target.files[0]);
+});
+
+// URL読み込みボタン
+document.getElementById('urlLoadBtn').addEventListener('click', () => {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) { alert('URLを入力してください。'); return; }
+  loadCSVFromURL(url);
+});
+
+// URL入力欄でEnterキーでも読み込める
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const url = e.target.value.trim();
+    if (url) loadCSVFromURL(url);
+  }
+});
+
+// GitHub Pages経由で自動読み込み（URLパラメータ ?src= が指定されている場合）
+(function autoLoadFromParam() {
+  const params = new URLSearchParams(window.location.search);
+  const src = params.get('src');
+  if (src) {
+    document.getElementById('urlInput').value = src;
+    loadCSVFromURL(src);
+  }
+})();
+
+// ドラッグ＆ドロップ
+document.body.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drag-over'); });
+document.body.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('drag-over'); });
+document.body.addEventListener('drop', e => {
+  e.preventDefault();
+  document.body.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.endsWith('.csv')) loadCSV(file);
+  else alert('.csvファイルをドロップしてください');
+});
+
+// ※ 利回り入力イベントはスライダー関数内で登録済み
+
+// 証券コード入力
+document.getElementById('codeFilter').addEventListener('input', applyFilters);
+</script>
+</body>
+</html>
