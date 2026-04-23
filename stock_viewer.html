@@ -116,6 +116,34 @@
     font-size: 11px;
     white-space: nowrap;
   }
+  /* GitHub自動読み込みボタン */
+  .gh-load-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    background: rgba(255,255,255,.95);
+    color: #3b6bdc;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .12s, opacity .12s;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  }
+  .gh-load-btn:hover { background: #fff; }
+  .gh-load-btn:disabled { opacity: .6; cursor: not-allowed; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gh-spin {
+    display: inline-block;
+    width: 13px; height: 13px;
+    border: 2px solid rgba(59,107,220,.3);
+    border-top-color: #3b6bdc;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
 
   /* ── メインコンテンツ ── */
   .main { padding: 16px 20px; max-width: 100%; }
@@ -524,21 +552,29 @@
 <div class="app-header">
   <h1>📊 株式スコア比較ツール</h1>
   <div class="file-zone">
-    <!-- ローカルファイル読み込み -->
-    <label class="file-label" for="fileInput">
-      <span>📂</span> ローカルCSV
-    </label>
-    <input type="file" id="fileInput" accept=".csv">
-    <span id="fileNameDisplay">未選択</span>
 
-    <span class="url-sep">｜</span>
-
-    <!-- URL読み込み（GitHub Pages / raw.githubusercontent.com） -->
-    <div class="url-zone">
-      <input type="text" id="urlInput" class="url-input"
-        placeholder="GitHub raw URL を貼り付け（外出先用）">
-      <button class="url-btn" id="urlLoadBtn">読み込む</button>
+    <!-- GitHub Pages で開いているとき: ボタン1つ -->
+    <div id="ghZone" style="display:none">
+      <button class="gh-load-btn" id="ghLoadBtn">
+        <span id="ghLoadIcon">🔄</span> 最新データを読み込む
+      </button>
     </div>
+
+    <!-- ローカル or 手動URL: 従来UI -->
+    <div id="localZone" style="display:none; align-items:center; gap:10px; flex-wrap:wrap;">
+      <label class="file-label" for="fileInput">
+        <span>📂</span> ローカルCSV
+      </label>
+      <input type="file" id="fileInput" accept=".csv">
+      <span id="fileNameDisplay">未選択</span>
+      <span class="url-sep">｜</span>
+      <div class="url-zone">
+        <input type="text" id="urlInput" class="url-input"
+          placeholder="GitHub raw URL を貼り付け">
+        <button class="url-btn" id="urlLoadBtn">読み込む</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -734,19 +770,30 @@ function loadCSV(file) {
 }
 
 // URL からCSVを取得（GitHub raw URL 対応）
-async function loadCSVFromURL(url) {
+async function loadCSVFromURL(url, silent) {
   if (!url) return;
-  document.getElementById('fileNameDisplay').textContent = '読み込み中...';
+  if (!silent) document.getElementById('fileNameDisplay').textContent = '読み込み中...';
   try {
-    const res = await fetch(url);
+    const res = await fetch(url + '?t=' + Date.now()); // キャッシュ回避
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     const shortName = url.split('/').pop() || 'url-loaded.csv';
     processCSVText(text, shortName);
   } catch(e) {
-    alert(`URLからの読み込みに失敗しました。\n${e.message}\n\nCORSエラーの場合: raw.githubusercontent.com のURLを使用してください。`);
-    document.getElementById('fileNameDisplay').textContent = '読み込み失敗';
+    alert(`URLからの読み込みに失敗しました。\n${e.message}`);
+    if (!silent) document.getElementById('fileNameDisplay').textContent = '読み込み失敗';
   }
+}
+
+// GitHub Pages のURLからraw CSVのURLを自動導出
+// https://username.github.io/repo-name/... → https://raw.githubusercontent.com/username/repo-name/main/stock_scores.csv
+function getGitHubRawURL() {
+  const host = window.location.hostname;
+  if (!host.endsWith('.github.io')) return null;
+  const username = host.replace('.github.io', '');
+  const repo = window.location.pathname.split('/').filter(Boolean)[0];
+  if (!username || !repo) return null;
+  return `https://raw.githubusercontent.com/${username}/${repo}/main/stock_scores.csv`;
 }
 
 // =============================================
@@ -1135,36 +1182,58 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 });
 
 // =============================================
-// ファイル入力 / URL入力
+// ファイル入力 / URL入力 / GitHub自動読み込み
 // =============================================
-document.getElementById('fileInput').addEventListener('change', e => {
-  if (e.target.files[0]) loadCSV(e.target.files[0]);
-});
 
-// URL読み込みボタン
-document.getElementById('urlLoadBtn').addEventListener('click', () => {
-  const url = document.getElementById('urlInput').value.trim();
-  if (!url) { alert('URLを入力してください。'); return; }
-  loadCSVFromURL(url);
-});
+// GitHub Pages か否かでUIを切り替え
+const ghRawURL = getGitHubRawURL();
+if (ghRawURL) {
+  // GitHub Pages: ボタン1つのシンプルUI
+  document.getElementById('ghZone').style.display = 'flex';
 
-// URL入力欄でEnterキーでも読み込める
-document.getElementById('urlInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    const url = e.target.value.trim();
-    if (url) loadCSVFromURL(url);
-  }
-});
+  // ページを開いたら自動で読み込む
+  (async () => {
+    const btn = document.getElementById('ghLoadBtn');
+    const icon = document.getElementById('ghLoadIcon');
+    btn.disabled = true;
+    icon.outerHTML = '<span id="ghLoadIcon" class="gh-spin"></span>';
+    await loadCSVFromURL(ghRawURL, true);
+    document.getElementById('ghLoadIcon').outerHTML = '<span id="ghLoadIcon">🔄</span>';
+    btn.disabled = false;
+  })();
 
-// GitHub Pages経由で自動読み込み（URLパラメータ ?src= が指定されている場合）
-(function autoLoadFromParam() {
-  const params = new URLSearchParams(window.location.search);
-  const src = params.get('src');
-  if (src) {
-    document.getElementById('urlInput').value = src;
-    loadCSVFromURL(src);
-  }
-})();
+  // ボタンクリックで再読み込み（最新データに更新）
+  document.getElementById('ghLoadBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('ghLoadBtn');
+    const icon = document.getElementById('ghLoadIcon');
+    btn.disabled = true;
+    icon.outerHTML = '<span id="ghLoadIcon" class="gh-spin"></span>';
+    await loadCSVFromURL(ghRawURL, true);
+    document.getElementById('ghLoadIcon').outerHTML = '<span id="ghLoadIcon">🔄</span>';
+    btn.disabled = false;
+  });
+
+} else {
+  // ローカル / その他: 従来UI（ファイル選択 + URL入力）
+  document.getElementById('localZone').style.display = 'flex';
+
+  document.getElementById('fileInput').addEventListener('change', e => {
+    if (e.target.files[0]) loadCSV(e.target.files[0]);
+  });
+
+  document.getElementById('urlLoadBtn').addEventListener('click', () => {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) { alert('URLを入力してください。'); return; }
+    loadCSVFromURL(url);
+  });
+
+  document.getElementById('urlInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const url = e.target.value.trim();
+      if (url) loadCSVFromURL(url);
+    }
+  });
+}
 
 // ドラッグ＆ドロップ
 document.body.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drag-over'); });
